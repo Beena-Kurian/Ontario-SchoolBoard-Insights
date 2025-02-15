@@ -27,6 +27,6 @@ Perform statistical inference to determine significant differences across school
 
 `git clone https://github.com/your-username/ON-SchoolBoard-Insights.git`
 
-- Install dependencies in R:
-
-Open and run the `Government_of_Ontario_Schoo_ Board_Achievements_and_Progress.Rmd` file in RStudio to generate insights.
+- Install dependencies in R: Link: https://posit.co/download/rstudio-desktop/
+  
+- Open and run the `Government_of_Ontario_Schoo_ Board_Achievements_and_Progress.Rmd` file in RStudio

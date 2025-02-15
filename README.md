@@ -3,6 +3,8 @@
 ### Overview
 This project analyzes and visualizes the achievements and progress of school boards in Ontario, Canada. It provides insights into various educational performance metrics, funding distribution, student success rates, and policy impacts using statistical analysis and data visualization techniques.
 
+### Datasource
+Government of Ontario. (2024). School board achievements and progress (2022-2023). The Education Quality and Accountability Office (EQAO). Retrieved from https://data.ontario.ca/dataset/school-board-achievements-and-progress
 ### Objectives
 Analyze student performance across Ontario school boards.
 Identify trends and insights related to school funding, credit accumulation, and graduation rates.

@@ -1,0 +1,610 @@
+---
+title: "Government of Ontario, School Board Achievements and Progress"
+author: Beena Kurian
+date: "2025-02-14"
+output: word_document
+---
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+# This sets the working directory
+knitr::opts_knit$set(root.dir = 'D:/Conestoga/MyProjects/Ontario-SchoolBoard-Insights')
+
+```
+
+```{r, include=FALSE}
+if(!is.null(dev.list())) dev.off()
+cat("\014") 
+rm(list=ls())
+options(scipen=9)
+```
+##################################################################
+## Load packages                                                 #
+##################################################################
+```{r}
+# Load package pastecs
+if(!require(pastecs)){install.packages("pastecs")}
+library("pastecs")
+```
+
+##################################################################
+## Read Data and print Data                                      #
+##################################################################
+```{r}
+# Read data set
+data  <- read.csv("Ontario_School_Board_Performance.txt", header=TRUE)
+
+# Convert data frame
+data  <- as.data.frame(data )
+
+# printing head
+head(data )
+```
+
+##################################################################
+#  Data Transformation and Preparation                          #
+##################################################################
+## Initial Transformation
+
+### Transform variables as appropriate (e.g. selected character to factor, numeric if needed, etc.)
+
+```{r}
+str(data )
+```
+From the structure , it is clear that, we have 72 observations and 20 variables.
+Among the 20 variables, 8 variables are character type and one column is logical type. 
+
+Let's keep the following columns as character type itself:
+
+* Code 
+
+* Name 
+
+* City 
+
+Change the following character types to factor types:
+
+* Language 
+
+* Type 
+
+* Region 
+
+Change the following type from character to numeric type:
+
+* Y5_Grd_Rt 
+
+* Y5_Grd_Rt_P  
+
+```{r}
+# Character to factor conversion
+data $Language  <- as.factor(data $Language )
+data $Type  <- as.factor(data $Type )
+data $Region  <- as.factor(data $Region )
+
+# Character to numeric conversion
+suppressWarnings(data $Y5_Grd_Rt  <- as.numeric(data $Y5_Grd_Rt ))
+suppressWarnings(data $Y5_Grd_Rt_P  <- as.numeric(data $Y5_Grd_Rt_P ))
+
+```
+
+After conversion, let's review the structure of the data frame, 
+
+```{r}
+str(data )
+```
+### Delete any rows of the dataframe containing more than 1 NA value.
+##############################################################################################
+
+```{r}
+# printing rows with more than one 'NA' values
+data [rowSums(is.na(data )) > 1, ]
+```
+
+The rows 45 and 58 have more than one NA values. Let's delete those rows.
+
+```{r}
+# remove rows with more than one 'NA' values
+data_cleaned  <- data [rowSums(is.na(data )) <= 1, ]
+
+# check dimension after removal
+dim(data_cleaned )
+```
+After deletion, we have 70 rows and 20 columns in the data frame.
+
+##############################################################################################
+##  Outliers Removal
+##############################################################################################
+
+```{r}
+par(mfrow=c(1,2))    
+for (i in 1:ncol(data_cleaned ))                   
+{
+  if(is.numeric(data_cleaned [,i]))
+  {
+    boxplot(data_cleaned [i],
+    main = names(data_cleaned )[i],
+    horizontal = TRUE,col = "lightblue",
+    pch = 2, cex.main=0.8, cex.lab=0.8, cex.axis = 0.6)
+  }
+}
+par(mfrow = c(1,1))
+```
+
+From Box plots, it is clear that, 
+
+* The box plots for G6_EQAO , G6_EQAO_S , and Y4_Grd_Rt  do not contain any outliers.
+
+* All other box plots show the presence of outliers.
+
+* Most outliers, except one in G11_Credit_Acc , can be retained as they are not significantly far from the lower or upper boundaries and could represent valid data points.  
+
+* The outlier in G11_Credit_Acc  is far from the whiskers, indicating a possible data issue, as it represents negative credit accumulation which is not possible.
+
+Credit accumulation can't be negative, but progress in credit accumulation can be negative if a student fails, withdraws, or earns fewer credits than expected. Thus, negative outlier in column named G11_Credit_Acc  must be handled properly.
+
+Let's also look at the density plots, to look at anomalous values if any.
+
+```{r}
+par(mfrow=c(1,2))
+for (i in 1:ncol(data_cleaned ))
+{
+  if(is.numeric(data_cleaned [,i]))
+  {
+    plot(density(data_cleaned [[i]], na.rm = TRUE), 
+    main = names(data_cleaned )[i],
+    pch = 10, cex.main=0.8, cex.lab=0.8, cex.axis = 0.6,col = 12)
+    
+    rug(data_cleaned [[i]], col = "red")
+  }
+  
+}
+par(mfrow = c(1,1))
+```
+
+**Analysis of Outliers in Student Credit Related Columns**
+
+By evaluating the above box plots and density plots, all the outliers are acceptable, except column named ***"G11_Credit_Acc "***. Based on the Box Plot and Density Plot of G11_Credit_Acc , it is evident that G11_Credit_Acc  contains an outlier with a value below zero. Since credit accumulation cannot logically be negative, this value is likely a data entry error. To prevent this error from affecting the analysis, I am removing the row with the min value.
+
+
+```{r}
+# Remove rows where G11_Credit_Acc is equal to its minimum value
+data_cleaned <- data_cleaned[data_cleaned$G11_Credit_Acc != min(data_cleaned$G11_Credit_Acc, na.rm = TRUE), ]
+
+```
+**Analysis of Outliers in Enrollment and Funding Columns**
+
+Let's check the outliers in Enrollment and Funding columns where the density plots are right skewed. Even though there are outliers in the data, I do not believe they are errors. 
+
+According to my observation, certain school types with record-high enrollments have received higher funding from the province. Also, funding allocations vary by region.
+
+From the news article, (Link: w.cbc.ca/news/canada/london/london-area-school-boards-get-more-than-260m-to-build-6-new-schools-1.7443833) London-area school boards get more than $260M to build 6 new schools. Thus more than 260 Million Funding can not be considered as an anomaly in data. It represents actual value. In the NEWS article, they mentioned, due to record-high enrollment, they requested more funds from province to build 6 new schools. So I am keeping this outlier as it is.
+
+The below aggregations is an evidence of my reason to keep outliers as it is.
+```{r}
+top_3_funding <- data_cleaned [order(-data_cleaned $Funding ), ][1:3, ]
+print(top_3_funding )
+```
+```{r}
+top_3_enrollment  <- data_cleaned [order(-data_cleaned $Enrollment ), ][1:3, ]
+print(top_3_enrollment )
+```
+Note: Top 3 enrollments and top 3 funding school boards are same indicating more funding as they have more enrollments.
+Lets check region based enrollments,
+```{r}
+# Compute and sort average funding by Region  
+avg_funding_by_region  <- aggregate(Funding  ~ Region , data = data_cleaned , FUN = mean, na.rm = TRUE)
+print(avg_funding_by_region )
+
+# Compute and sort average enrollment by Region  
+avg_erollment_by_region  <- aggregate(Enrollment  ~ Region , data = data_cleaned , FUN = mean, na.rm = TRUE)
+print(avg_erollment_by_region )
+
+```
+Note: Enrollments and Funding based on region is also a valid information. Region with higher enrollments received more provincial funds.
+
+```{r}
+# Compute average funding by Type in descending order
+avg_funding_by_type  <- aggregate(Funding  ~ Type , data = data_cleaned , FUN = mean, na.rm = TRUE)
+# Display result
+print(avg_funding_by_type )
+
+# Compute average enrollment by Type in descending order
+avg_enrollment_by_type  <- aggregate(Enrollment  ~ Type , data = data_cleaned , FUN = mean, na.rm = TRUE)
+# Display result
+print(avg_enrollment_by_type )
+
+```
+Public school boards have higher enrollments and received more funding. Based on all these analysis, I am keeping those outliers believing that they are not anomalies in data and I am keeping those values.
+
+However, if we need to compute the average school funding at the provincial level, these high funding values can skew the mean upwards. In such cases, it is better to remove outliers to obtain a more balanced estimate of the funding per school board. Since my main goal is on analyzing credit accumulation across the province, I have decided to retain these outliers in the data set.
+
+### Check for any outliers in categorical Columns
+```{r}
+# plot box plots of categorical values
+par(mfrow=c(2,2))
+barplot(table(data_cleaned $Region ),col = "lightblue", cex.names=.75, ylab="Frequency",las=2)
+barplot(table(data_cleaned $Language ),col = "lightblue", cex.names=.75, ylab="Frequency")
+barplot(table(data_cleaned $Type ),col = "lightblue", cex.names=.75, ylab="Frequency")
+par(mfrow=c(1,1))
+```
+
+No Outliers in categorical columns.
+##############################################################################################
+# Data Visualisations
+##############################################################################################
+
+```{r}
+# Select top 5 school boards by funding
+top_5_funding <- data_cleaned[order(-data_cleaned$Funding), ][1:5, ]
+
+# Create bar plot
+barplot(
+  top_5_funding$Funding,
+  names.arg = top_5_funding$Name,
+  main = "Top 5 School Boards by Funding",
+  xlab = "",
+  ylab = "",
+  col = "lightblue",
+  las = 2,
+  cex.names=.55,cex.lab=0.8, cex.axis = 0.6
+)
+
+```
+
+```{r}
+# Select top 5 school boards by Enrollment
+top_5_Enrollment <- data_cleaned[order(-data_cleaned$Enrollment), ][1:5, ]
+
+# Create bar plot
+barplot(
+  top_5_Enrollment$Enrollment,
+  names.arg = top_5_Enrollment$Name,
+  main = "Top 5 School Boards by Enrollment",
+  xlab = "",
+  ylab = "",
+  col = "lightpink",
+  las = 2,
+  cex.names=.55,cex.lab=0.8, cex.axis = 0.6
+)
+```
+
+##############################################################################################
+## Reduce Dimensionality
+
+### Drop any variables that do not contribute any useful analytical information at all.
+```{r}
+colnames(data_cleaned )
+```
+
+Columns 'Code ' is not useful for analytical purposes,so I am dropping that column.
+
+```{r}
+# save a copy of data frame to compare time at th end
+data_before_reduction  <- data_cleaned 
+
+# remove col 1,2,6
+data_cleaned  <- data_cleaned [-c(1)]
+summary(data_cleaned )
+```
+
+### Apply the Missing Value Filter to remove appropriate columns of data.
+
+Look at column, G6_EQAO_P 
+
+As all values are NA, I am dropping this column.
+
+```{r}
+# remove col 8
+data_cleaned  <- data_cleaned [-c(8)]
+summary(data_cleaned )
+```
+### Apply the Low Variance Filter to remove appropriate columns of data.
+
+Check for coefficient of variance value, to find low variance variables,
+
+```{r}
+# Select only numeric columns
+data_cleaned_numeric<- data_cleaned[,unlist(lapply(data_cleaned, is.numeric))]
+
+# Display statistics
+round(stat.desc(data_cleaned_numeric),3)
+```
+
+Lets look into selected columns with low coefficient of variation to check the variability in the data. 
+```{r}
+# Column G6_EQAO  with CV=0.082
+table(data_cleaned$G6_EQAO)
+
+# Column G10_OSSLT  with CV=0.081
+table(data_cleaned$G10_OSSLT)
+
+# Column Y5_Grd_Rt  with CV=0.075
+table(data_cleaned$Y5_Grd_Rt)
+```
+I have checked the coefficient of variation of various columns, I didn't find a low variance column to remove. So, I am not applying this filter and going to check next high correlation filter.
+
+### Apply the High Correlation Filter to remove appropriate columns of data.
+
+```{r}
+
+# Compute spearman correlation on numeric columns only
+round(cor(data_cleaned[,unlist(lapply(data_cleaned ,is.numeric))],method="spearman"),3)
+
+```
+Here, G6_EQAO  and G6_EQAO_S  are perfectly correlated with a positive correlation of 1.0, We don't need to keep both, I will drop the column G6_EQAO_S .
+
+```{r}
+# removing col 7 which is G6_EQAO_S 
+data_cleaned<- data_cleaned[-c(7)]
+head(data_cleaned,5)
+
+```
+### Benefits of reducing the dimensionality of this particular dataset? Be specific. For example, if it increases computational efficiency, specify how much of an improvement.
+
+```{r}
+# Compute the time taken to process dataframe before dimensionality reduction
+start1<-Sys.time()
+corr_start1 <- round(cor(data_before_reduction [,unlist(lapply(data_before_reduction,is.numeric))],method="spearman"),3)
+end1  <- Sys.time()
+time_before_reduction<-end1 -start1 
+
+
+# Compute the time taken to process dataframe after dimensionality reduction
+start2  <- Sys.time()
+corr_start2 <- round(cor(data_cleaned[,unlist(lapply(data_cleaned ,is.numeric))],method="spearman"),3)
+end2  <- Sys.time()
+time_after_reduction<- end2 -start2 
+
+# Time taken before dimensionality reduction
+print(paste("Before Reduction:", round(time_before_reduction, 5)))
+
+# Time taken after dimensionality reduction
+print(paste("After Reduction:", round(time_after_reduction, 5)))
+
+# Time saved after dimensionality reduction
+print(paste("Saved Time:", round(time_before_reduction-time_after_reduction , 5)))
+
+```
+By removing non-essential columns, the time taken to process the dataset is reduced. The original computation took  0.00514 seconds, while the optimized version took 0.00487 seconds, resulting in a time savings of approximately 0.00027 seconds. This may seem small, but for larger datasets, this efficiency gain will be really make computation more efficient.
+
+##################################################################
+# Organizing Data                                              #
+##################################################################
+## Histogram and Scatter Plots 
+### Histogram for Grade 10 Credit Accumulation
+```{r}
+par(mfrow = c(1, 2))
+hist(data_cleaned $G10_Credit_Acc  ,
+     col="blue",
+     main = "Grade 10 Credit Accumulation",
+     ylab = "Frequency",
+     xlab = "Credit accumulation",
+     breaks = seq(0.4, 1, 0.05),
+     density = 23, angle= 24,
+     cex.main=0.8, cex.lab = 0.8, cex.axis = 0.8
+     )
+```
+
+### Histogram for Five Year Graduation Rate
+```{r}
+hist(data_cleaned $Y5_Grd_Rt  ,
+     col="blue",
+     main = "5 Year Graduation Rate",
+     ylab = "Frequency",
+     xlab = "Five year graduation rate",
+     breaks = seq(0.6, 1, 0.05),
+     density = 23, angle= 24, 
+     cex.main=0.8, cex.lab = 0.8, cex.axis = 0.8
+     )
+```
+
+### scatter plot showing the relationship between Grade 10 Credit Accumulation and Five Year Graduation Rate. 
+
+```{r}
+par(mfrow = c(1, 1))
+plot(data_cleaned $G10_Credit_Acc , data_cleaned $Y5_Grd_Rt ,
+     main = "Grade 10 Credit Accumulation & 5 Year Graduation Rate",
+     xlab = "Grade 10 credit accumulation",
+     ylab = "Five year graduation rate",
+     col = 122, 
+     pch = 8, 
+     cex.main=0.8, cex.lab = 0.8, cex.axis = 0.8)
+abline(coef = c(6,0)) 
+```
+
+### Conclusions from chart
+
+From the histograms, both histograms are mildly left skewed distribution.
+
+From the scatter plot, there appears to be a strong positive correlation between Grade 10 credit accumulation rates and 5 year graduation rates. As Grade 10 credit accumulation increases, the 5 year graduation rate also tends to increase. This suggests that students who accumulate more credits by Grade 10 are more likely to graduate within five years. 
+
+###correlation coefficient between Grade 10 credit accumulation rates and 5 year graduation rates
+
+```{r}
+# calculating spearman correlation coefficient
+round(cor(data_cleaned $G10_Credit_Acc , data_cleaned $Y5_Grd_Rt , method = "spearman"),3)
+
+```
+***Reasons for choosing the spearman correlation coefficient***: 
+
+From the histogram plot, 
+
+* G10_Credit_Acc  : Data in this column shows mildly left skewed distribution.
+
+* Y5_Grd_Rt  : Data in this column shows more left skewed distribution than the previous. 
+
+Pearson correlation assumes both variables are normally distributed. Since variables are skewed, Pearson is not a good choice. That is the reason behind my selection of spearman correlation test. 
+
+The correlation coefficient is 0.843 , which shows strong positive correlation between the variables G10_Credit_Acc  and Y5_Grd_Rt . 
+
+
+##################################################################
+# Inference                                                    # 
+##################################################################
+## Normality
+### QQ Normal plot of for Progress in Four Year Graduation Rates.
+
+```{r}
+# Create a QQ Normal plot of for Progress in Four Year Graduation Rates.
+qqnorm(data_cleaned $Y4_Grd_Rt_P , 
+       main="QQplot of Progress in Four Year Graduation Rates", 
+       pch=20,col=26, 
+       cex.main=0.8, 
+       cex.lab = 0.8, 
+       cex.axis = 0.8)
+
+qqline(data_cleaned $Y4_Grd_Rt_P )
+```
+
+### statistical test for normality on Progress in Four Year Graduation Rates.
+```{r}
+# Shapiro-wilk Test for normality on Progress in Four Year Graduation Rates
+shapiro.test(data_cleaned $Y4_Grd_Rt_P )  
+
+```
+### Is Progress in Four Year Graduation Rates normally distributed?
+
+Yes, Progress in Four Year Graduation Rates are normally distributed. 
+
+From the QQ plot, It is very clear that the column Y4_Grd_Rt_P  is normally distributed. However, to make sure, let's check the shapiro-wilk test results.
+
+***From Shapiro-Wilk normality test Result :***
+
+The Null Hypothesis of Shapiro-Wilk Test is that the variable is Normally distributed.
+As p-value = 0.2759 > 0.05, we failed to reject the Null Hypothesis. Thus, there is no strong evidence to suggest that the data is not normally distributed.
+
+Both the QQ plot and the Shapiro-Wilk test confirm that Progress in Four-Year Graduation Rates follows a normal distribution.
+
+################################################################################################
+## Statistically Significant Differences
+### Compare Progress in Four Year Graduation Rates between Types of School Board in your dataset using a hypothesis test.
+
+#### T-Test
+
+```{r}
+# Run T-test ( Reason for the selection is imcluded in the coming section)
+t.test(Y4_Grd_Rt_P  ~ Type , data = data_cleaned , var.equal = TRUE)
+```
+T - test, p-value = 0.08946 > 0.05, So we failed to reject the null hypothesis. This means that there is no significant difference in means of Progress in 4 yr graduation rate between Public and Roman Catholic school boards.
+
+### Reason for the choice of T-test
+
+Selected test : T-test
+
+First check the variable is categorical or continuous. The progress in 4 yr graduation rate is continuous, 
+
+Let's check how many groups are compared, 
+```{r}
+# Check for unique values in the column 4 yr graduation rate
+unique(data_cleaned $Type )
+```
+We have two levels(2 groups), Public and Roman Catholic as Types of Boards. 
+
+We have two options, T-test or Wilcoxian Rank as we have 2 groups. 
+
+***For T-test to use, 3 assumptions must satisfy,***
+
+1. Data Independence(satisfied, as Progress in 4 yr graduation rate of public board is independent with Roman catholic type)
+
+2. Data is Normally distributed(satisfied, from the previous section, Progress in Four Year Graduation Rates is normally distributed as p-value = 0.2759 > 0.05, we failed to reject the null hypothesis, thus we assume it is normally distributed.)
+
+```{r}
+# Shapiro-wilk Test for normality on Progress in Four Year Graduation Rates
+shapiro.test(data_cleaned $Y4_Grd_Rt_P )  
+
+```
+3. Variance is unknown, but equal (satisfied from the above F-Test, p-value = 0.1462 > 0.05, failed to reject the null hypothesis. The variance of the two groups should be equal.)
+
+```{r}
+# F- test for variance
+var.test(Y4_Grd_Rt_P  ~ Type , data = data_cleaned )
+```
+Since p-value = 0.1462 > 0.05, we failed to reject the null hypothesis. This means we do not have strong evidence to conclude that the variances are different between the groups. Therefore, we assume variances when comparing means of Y4_Grd_Rt_P  between type of school boards are equal.
+As all three assumptions (independence, normality, and equal variance) are satisfied, I have chosen the T-test to compare the means of the two groups as in previous section.
+
+### Do we have strong evidence that Progress in Four Year Graduation Rate is different between Types of school board?
+
+No, Since the p-value of t-test (0.08946) is greater than 0.05, we fail to reject the null hypothesis. There is no strong statistical evidence that the Progress in Four-Year Graduation Rate differs between Public and Roman Catholic schools.
+
+##############################################################################################
+# Multiple Statistical Differences
+## Determine if Grade 6 EQAO scores vary by Language and Board Type using ANOVA (statistical) and a sequence of boxplots (graphical).
+
+### Grade 6 EQAO scores by Language and Board Type using ANOVA (statistical)
+```{r}
+#Two-Way ANOVA
+ANOVA_GR6_EQAO_LB  <- aov(G6_EQAO  ~ Language  + Type , data = data_cleaned )
+summary(ANOVA_GR6_EQAO_LB )
+```
+* Since Pr(>F) value = 1.08e-14 < 0.05, we reject the null hypothesis. We have strong evidence that Grade 6 EQAO scores vary by language.
+
+* Since Pr(>F) value = 0.0733 > 0.05, we fail to reject the null hypothesis. There is no strong evidence to conclude that Grade 6 EQAO scores vary by board type.
+
+* Overall, language has a much stronger impact than board type on Grade 6 EQAO scores.
+
+### Grade 6 EQAO scores by Language and Board Type using boxplots (graphical).
+```{r}
+# Grade 6 EQAO scores vary by Language and Board Type
+boxplot(G6_EQAO  ~ Language  + Type , data=data_cleaned ,
+        main="6 EQAO scores by Language and Board Type",
+        xlab= "Language:Board Type",col = "lightblue",
+        ylab= "Grade 6 EQAO Score",cex.axis = 0.7)
+
+```
+From the box plot, Grade 6 EQAO vary by Language. But in case, of Grade 6 EQAO score by board types, there is no much visible variation. 
+
+French-language schools scoring higher than English-language schools. 
+
+Board type has a smaller impact, but Catholic schools score slightly higher than Public schools.
+
+
+## Determine if Grade 6 EQAO scores vary by Region using ANOVA (statistical) and a sequence of boxplots (graphical).
+#########################################################################################################################
+
+### Grade 6 EQAO scores by Region using ANOVA (statistical)
+
+```{r}
+#One-Way ANOVA
+ANOVA_GR6_EQAO_R  <- aov(G6_EQAO ~Region , data=data_cleaned )
+summary(ANOVA_GR6_EQAO_R )
+```
+* Since Pr(>F) value = 0.237 > 0.05, We failed reject the null hypothesis. There is no strong evidence that Grade 6 EQAO scores differ significantly between regions.
+
+### Grade 6 EQAO scores by Region using boxplots(graphical).
+```{r}
+# Box plot of Grade 6 EQAO scores  by Region
+par(mar = c(5, 8, 4, 2)) 
+boxplot(G6_EQAO  ~ Region ,
+        ylab = "",
+        data = data_cleaned ,
+        main = "Grade 6 EQAO scores by Region",
+        col = "lightblue",
+        horizontal=TRUE,
+        xlab = "EQAO Scores",
+        pch=15,las=2,
+        cex.axis = 0.8 )
+
+```
+The box plot visually represents the distribution of Grade 6 EQAO scores across different regions. There are some visible differences, but not enough to be statistically significant.
+
+###################################################################################################################
+# 4. References
+###################################################################################################################
+1. Marsh, D. (2025). PROG8435-L01-25W [Lecture slides].
+2. Marsh, D. (2025). PROG8435-L02-25W [Lecture slides].
+3. Marsh, D. (2025). PROG8435-L03-25W-Clss [Lecture slides].
+4. Marsh, D. (2025). PROG8435-L04-25W [Lecture slides].
+5. Marsh, D. (2025). PROG8435-L05-24F [Lecture slides].
+6. Marsh, D. (2025). PROG8435-Demo-Summarize.Rmd [R Markdown file]
+7. Marsh, D. (2025). PROG8435-Inference Demo.Rmd [R Markdown file]
+8. Marsh, D. (2025). PROG8435_Dimensionality_Demo.Rmd [R Markdown file]
+9. Marsh, D. (2025). PROG8435 Outlier Demo.Rmd [R Markdown file]
+10 Marsh, D. (2025). PROG8435-ANOVA-Demo.Rmd [R Markdown file]
+11.Marsh, D. (2025) Creating Graphs for All Numeric Variables [Video]. YouTube. https://www.youtube.com/watch?v=j3uhHpYtXNg
+12. Marsh, D. (2025). A note on Hypothesis Testing[PDF]
+13. Douglas, A., Roos, D., Mancini, F., Couto, A., & Lusseau, D. (2024). An introduction to R. Retrieved: https://intro2r.com/mult_graphs.html
+14. Bhargava, I. (2025, January 28). London-area school boards get more than $260M to build 6 new schools. CBC News. https://www.cbc.ca/news/canada/london/london-area-school-boards-get-more-than-260m-to-build-6-new-schools-1.7443833
+15. Government of Ontario. (2024). School board achievements and progress (2022-2023). The Education Quality and Accountability Office (EQAO). Retrieved from https://data.ontario.ca/dataset/school-board-achievements-and-progress
+###################################################################################################################
+

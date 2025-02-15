@@ -16,11 +16,11 @@ Perform statistical inference to determine significant differences across school
 - Spearman correlation, Box Plots, Histograms, and Scatter Plots for exploratory data analysis
 
 ### Key Features
-✔ Data Cleaning & Transformation: Handling missing values, data type conversions, and outlier analysis
-✔ Descriptive Statistics: Distribution analysis, summary statistics, and correlation tests
-✔ Dimensionality Reduction: Identifying low-variance and highly correlated features for efficient analysis
-✔ Inferential Statistics: Normality testing, hypothesis testing, and comparisons of school types
-✔ Visual Insights: Graphical representations of student performance trends
+- Data Cleaning & Transformation: Handling missing values, data type conversions, and outlier analysis
+- Descriptive Statistics: Distribution analysis, summary statistics, and correlation tests
+- Dimensionality Reduction: Identifying low-variance and highly correlated features for efficient analysis
+- Inferential Statistics: Normality testing, hypothesis testing, and comparisons of school types
+- Visual Insights: Graphical representations of student performance trends
 
 ### To use
 - Clone this repository:
@@ -28,4 +28,5 @@ Perform statistical inference to determine significant differences across school
 `git clone https://github.com/your-username/ON-SchoolBoard-Insights.git`
 
 - Install dependencies in R:
-Open and run the .Rmd file in RStudio to generate insights.
+
+Open and run the `Government_of_Ontario_Schoo_ Board_Achievements_and_Progress.Rmd` file in RStudio to generate insights.
